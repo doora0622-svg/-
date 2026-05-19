@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "Presentation": {
+      "title": "Presentation State",
+      "description": "即時同步簡報的狀態",
+      "type": "object",
+      "properties": {
+        "current_page": {
+          "type": "integer",
+          "description": "當前投影片頁碼"
+        },
+        "total_pages": {
+          "type": "integer",
+          "description": "總投影片頁數"
+        },
+        "last_updated": {
+          "type": "integer",
+          "format": "timestamp",
+          "description": "最後更新時間戳"
+        }
+      },
+      "required": ["current_page", "total_pages"]
+    }
+  },
+  "firestore": {
+    "presentation/state": {
+      "schema": "Presentation",
+      "description": "存儲簡報同步狀態的單一節點"
+    }
+  }
+}

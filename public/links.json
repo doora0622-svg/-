@@ -1,0 +1,22 @@
+{
+  "1": [
+    {
+      "x": 10,
+      "y": 10,
+      "width": 20,
+      "height": 10,
+      "url": "https://www.youtube.com",
+      "label": "YouTube"
+    }
+  ],
+  "2": [
+    {
+      "x": 70,
+      "y": 80,
+      "width": 20,
+      "height": 10,
+      "url": "https://www.google.com",
+      "label": "Google"
+    }
+  ]
+}

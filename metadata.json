@@ -1,0 +1,8 @@
+{
+  "name": "互動式簡報演講與即時同步系統( GitHub)",
+  "description": "具備 PPTX 自動轉檔、即時畫筆同步、聽眾跟隨模式、縮圖總覽以及 Canvas 矩陣縮放功能的專業全端簡報系統。",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
