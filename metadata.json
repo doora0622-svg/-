@@ -1,8 +1,6 @@
 {
-  "name": "互動式簡報演講與即時同步系統( GitHub)",
-  "description": "具備 PPTX 自動轉檔、即時畫筆同步、聽眾跟隨模式、縮圖總覽以及 Canvas 矩陣縮放功能的專業全端簡報系統。",
+  "name": "考場專用全螢幕翻頁時鐘",
+  "description": "具備 3D 翻頁動畫、自動化考程顯示與點名計算器的監考專用網頁應用。",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
