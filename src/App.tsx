@@ -323,42 +323,6 @@ export default function App() {
       
       {/* 頂部按鈕：設定與全螢幕 */}
       <div className="absolute top-4 right-4 z-50 flex items-center space-x-4 opacity-25 hover:opacity-100 transition-opacity">
-        <div 
-          onClick={handleWakeLockToggle}
-          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer backdrop-blur-md border transition-all ${
-            wakeLockActive 
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-              : wakeLockError === 'permission'
-                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20'
-                : wakeLockError === 'not-supported'
-                  ? 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
-          }`}
-          title={
-            wakeLockActive 
-              ? "防螢幕休眠鎖定中，設備將維持在亮屏狀態" 
-              : wakeLockError === 'permission'
-                ? "目前處於內嵌預覽視窗，權限受限。請點擊右上角「在新分頁開啟」以順利啟用防休眠功能"
-                : wakeLockError === 'not-supported'
-                  ? "此設備瀏覽器不支援螢幕喚醒鎖定 API"
-                  : "防螢幕休眠未啟用，點擊啟用防休眠保護"
-          }
-        >
-          {wakeLockActive ? (
-            <Shield size={14} className="animate-pulse text-emerald-400" />
-          ) : (
-            <ShieldAlert size={14} className={wakeLockError === 'permission' ? "text-rose-400" : "text-amber-400"} />
-          )}
-          <span className="hidden sm:inline">
-            {wakeLockActive 
-              ? '防休眠保護中' 
-              : wakeLockError === 'permission'
-                ? '防休眠受限 (請點右上在新分頁開啟)'
-                : wakeLockError === 'not-supported'
-                  ? '不支援防休眠'
-                  : '未啟用防休眠'}
-          </span>
-        </div>
         <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-white/10 rounded-full cursor-pointer text-white">
           <Settings size={28} />
         </button>
@@ -719,9 +683,9 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* 畫面右下防休眠提醒與新分頁導引 */}
+      {/* 畫面下方中間防休眠提醒與新分頁導引 */}
       {settings.enableWakeLock !== false && (
-        <div className="absolute bottom-4 right-4 z-40 max-w-xs md:max-w-sm bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 pr-10 shadow-2xl text-white transition-all duration-300 hover:border-white/20 relative">
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:max-w-md bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 pr-10 shadow-2xl text-white transition-all duration-300 hover:border-white/20 relative">
           <button 
             onClick={() => {
               setSettings(prev => ({ ...prev, enableWakeLock: false }));
@@ -810,6 +774,41 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* 畫面下方中間的「休眠模式」與「防休眠模式」切換按鈕區 */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900/90 backdrop-blur-md border border-white/15 px-2 py-1.5 rounded-full shadow-2xl flex items-center space-x-1 select-none">
+        <button
+          onClick={() => {
+            setSettings(prev => ({ ...prev, enableWakeLock: false }));
+            releaseWakeLock();
+          }}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+            !wakeLockActive 
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+              : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <div className={`w-1.5 h-1.5 rounded-full ${!wakeLockActive ? 'bg-amber-400 animate-pulse' : 'bg-gray-500'}`} />
+          <span>一般休眠模式</span>
+        </button>
+
+        <span className="w-[1px] h-4 bg-white/10" />
+
+        <button
+          onClick={() => {
+            setSettings(prev => ({ ...prev, enableWakeLock: true }));
+            requestWakeLock(true);
+          }}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+            wakeLockActive 
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold shadow' 
+              : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Shield size={12} className={wakeLockActive ? "text-emerald-400 animate-pulse" : "text-gray-400"} />
+          <span>防螢幕休眠</span>
+        </button>
+      </div>
     </div>
   );
 }
