@@ -623,37 +623,43 @@ export default function App() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute right-0 top-0 h-full w-full md:w-[450px] bg-gray-900 shadow-2xl overflow-y-auto z-[100] border-l border-white/10"
+            className="absolute right-0 top-0 h-full w-full md:w-[380px] bg-gray-900 shadow-2xl overflow-y-auto z-[100] border-l border-white/10"
           >
-            <div className="p-8">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-bold flex items-center gap-3">
-                  <Settings className="text-blue-500" /> 客製化設定面板
+            <div className="p-5 md:p-6 text-white">
+              <div className="flex items-center justify-between mb-5 border-b border-white/10 pb-3">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Settings className="text-blue-500" size={18} /> 客製化設定面板
                 </h2>
-                <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-white/10 rounded-full">
-                  <X />
+                <button 
+                  onClick={() => setShowSettings(false)} 
+                  className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
+                  title="關閉"
+                >
+                  <X size={18} />
                 </button>
               </div>
 
               {/* 外觀設定 */}
-              <section className="mb-10 p-6 bg-white/5 rounded-2xl">
-                <h3 className="text-lg font-semibold mb-6 flex items-center gap-2 border-b border-white/10 pb-2">樣式與色彩</h3>
+              <section className="mb-5 p-4 bg-white/5 rounded-xl border border-white/5">
+                <h3 className="text-xs font-bold mb-3 flex items-center gap-2 border-b border-white/10 pb-1.5 text-zinc-200 tracking-wider">
+                  樣式與色彩
+                </h3>
                 
-                <div className="space-y-6">
+                <div className="space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <span>顯示秒數</span>
+                    <span className="text-xs text-zinc-100">顯示秒數</span>
                     <input 
                       type="checkbox" 
                       checked={settings.showSeconds}
                       onChange={(e) => setSettings({...settings, showSeconds: e.target.checked})}
-                      className="w-6 h-6 rounded accent-blue-500"
+                      className="w-5 h-5 rounded accent-blue-500 cursor-pointer"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                  <div className="flex items-center justify-between border-t border-white/5 pt-3">
                     <div className="flex flex-col">
-                      <span>啟用防螢幕休眠</span>
-                      <span className="text-xs text-zinc-400">保持設備在監考期間開啟亮屏</span>
+                      <span className="text-xs text-zinc-100">啟用防螢幕休眠</span>
+                      <span className="text-[10px] text-zinc-400">保持設備在監考期間開啟亮屏</span>
                     </div>
                     <input 
                       type="checkbox" 
@@ -668,32 +674,46 @@ export default function App() {
                           setTimeout(() => requestWakeLock(true), 50);
                         }
                       }}
-                      className="w-6 h-6 rounded accent-emerald-500 cursor-pointer"
+                      className="w-5 h-5 rounded accent-emerald-500 cursor-pointer"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-3">
                     <div>
-                        <label className="block text-xs text-gray-400 mb-2 uppercase tracking-widest">數字顏色</label>
-                        <input type="color" value={settings.digitColor} onChange={(e) => setSettings({...settings, digitColor: e.target.value})} className="w-full h-10 bg-transparent rounded cursor-pointer" />
+                      <label className="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider text-center">數字顏色</label>
+                      <input 
+                        type="color" 
+                        value={settings.digitColor} 
+                        onChange={(e) => setSettings({...settings, digitColor: e.target.value})} 
+                        className="w-full h-8 bg-transparent rounded cursor-pointer border border-white/10 p-0.5" 
+                      />
                     </div>
                     <div>
-                        <label className="block text-xs text-gray-400 mb-2 uppercase tracking-widest">卡片背景</label>
-                        <input type="color" value={settings.cardBg} onChange={(e) => setSettings({...settings, cardBg: e.target.value})} className="w-full h-10 bg-transparent rounded cursor-pointer" />
+                      <label className="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider text-center">卡片背景</label>
+                      <input 
+                        type="color" 
+                        value={settings.cardBg} 
+                        onChange={(e) => setSettings({...settings, cardBg: e.target.value})} 
+                        className="w-full h-8 bg-transparent rounded cursor-pointer border border-white/10 p-0.5" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-1 uppercase tracking-wider text-center">網頁背景</label>
+                      <input 
+                        type="color" 
+                        value={settings.pageBg} 
+                        onChange={(e) => setSettings({...settings, pageBg: e.target.value})} 
+                        className="w-full h-8 bg-transparent rounded cursor-pointer border border-white/10 p-0.5" 
+                      />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2 uppercase tracking-widest">網頁主背景</label>
-                    <input type="color" value={settings.pageBg} onChange={(e) => setSettings({...settings, pageBg: e.target.value})} className="w-full h-10 bg-transparent rounded cursor-pointer" />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2 uppercase tracking-widest">顯示字體</label>
+                  <div className="border-t border-white/5 pt-3">
+                    <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">顯示字體</label>
                     <select 
                       value={settings.fontFamily}
                       onChange={(e) => setSettings({...settings, fontFamily: e.target.value})}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none text-zinc-200"
                     >
                       <option value="var(--font-montserrat)">Montserrat (極簡粗體)</option>
                       <option value="'Roboto', sans-serif">Roboto (標準無襯線)</option>
@@ -704,59 +724,59 @@ export default function App() {
               </section>
 
               {/* 考程管理 */}
-              <section className="mb-10 p-6 bg-white/5 rounded-2xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-white/10 pb-3">
-                <h3 className="text-lg font-semibold flex items-center gap-2">考程自動排程</h3>
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                  <button 
-                    onClick={sortScheduleChronologically}
-                    className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 hover:text-blue-400 border border-white/10 px-3 py-1.5 rounded-full transition-all cursor-pointer"
-                    title="依開始時間先後順序自動排列考程"
-                  >
-                    <ArrowUpDown size={12} />
-                    <span>依時間排序</span>
-                  </button>
-                  <button 
-                    onClick={() => setSchedule([...schedule, { id: Date.now().toString(), period: '新', subject: '新考科', startTime: '12:00', endTime: '13:00' }])}
-                    className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-                  >
-                    <Plus size={14} />
-                    <span>新增考程</span>
-                  </button>
+              <section className="mb-5 p-4 bg-white/5 rounded-xl border border-white/5">
+                <div className="flex items-center justify-between gap-2 mb-3 border-b border-white/10 pb-1.5">
+                  <h3 className="text-xs font-bold text-zinc-200 tracking-wider">考程自動排程</h3>
+                  <div className="flex items-center gap-1.5">
+                    <button 
+                      onClick={sortScheduleChronologically}
+                      className="flex items-center gap-1 text-[10px] bg-zinc-800 hover:bg-zinc-700 hover:text-blue-400 border border-white/10 px-2.5 py-1 rounded-full transition-all cursor-pointer text-zinc-300"
+                      title="依開始時間先後順序自動排列考程"
+                    >
+                      <ArrowUpDown size={10} />
+                      <span>排序</span>
+                    </button>
+                    <button 
+                      onClick={() => setSchedule([...schedule, { id: Date.now().toString(), period: '新', subject: '新考科', startTime: '12:00', endTime: '13:00' }])}
+                      className="flex items-center gap-1 text-[10px] bg-blue-600 hover:bg-blue-500 px-2.5 py-1 rounded-full text-white font-medium transition-colors cursor-pointer"
+                    >
+                      <Plus size={10} />
+                      <span>新增</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
                   {schedule.map((item, index) => (
-                    <div key={item.id} className="p-4 bg-gray-800/50 rounded-xl border border-white/10 space-y-3 group relative">
-                      {/* 右上角操作按鈕 tray (重新排列、刪除功能鍵) */}
-                      <div className="absolute top-2 right-2 flex items-center space-x-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                    <div key={item.id} className="p-2.5 bg-gray-800/40 rounded-lg border border-white/5 space-y-2 group relative">
+                      {/* 右上角操作按鈕 tray */}
+                      <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-60 group-hover:opacity-100 transition-opacity">
                         <button 
                           disabled={index === 0}
                           onClick={() => moveScheduleItem(index, 'up')}
-                          className="text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:opacity-30 bg-gray-900/80 rounded p-1 border border-white/5 transition-colors cursor-pointer"
+                          className="text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:opacity-30 bg-gray-900/80 rounded p-0.5 border border-white/5 transition-colors cursor-pointer"
                           title="上移"
                         >
-                          <ChevronUp size={14} />
+                          <ChevronUp size={12} />
                         </button>
                         <button 
                           disabled={index === schedule.length - 1}
                           onClick={() => moveScheduleItem(index, 'down')}
-                          className="text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:opacity-30 bg-gray-900/80 rounded p-1 border border-white/5 transition-colors cursor-pointer"
+                          className="text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:opacity-30 bg-gray-900/80 rounded p-0.5 border border-white/5 transition-colors cursor-pointer"
                           title="下移"
                         >
-                          <ChevronDown size={14} />
+                          <ChevronDown size={12} />
                         </button>
                         <button 
                           onClick={() => setSchedule(schedule.filter(s => s.id !== item.id))}
-                          className="text-red-400 hover:text-red-300 bg-gray-900/80 rounded p-1 border border-red-500/10 transition-colors cursor-pointer"
+                          className="text-red-400 hover:text-red-300 bg-gray-900/80 rounded p-0.5 border border-red-500/10 transition-colors cursor-pointer"
                           title="刪除"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5 pr-14">
                         <input 
                           type="text" 
                           value={item.period} 
@@ -765,7 +785,7 @@ export default function App() {
                             newSched[index].period = e.target.value;
                             setSchedule(newSched);
                           }}
-                          className="w-1/4 bg-gray-700 border border-gray-600 rounded p-1 text-sm text-center"
+                          className="w-16 bg-gray-700 border border-gray-600 rounded p-1 text-[11px] text-center text-zinc-100 focus:border-blue-500 outline-none"
                           placeholder="第 X 節"
                         />
                         <input 
@@ -776,13 +796,13 @@ export default function App() {
                             newSched[index].subject = e.target.value;
                             setSchedule(newSched);
                           }}
-                          className="w-3/4 bg-gray-700 border border-gray-600 rounded p-1 text-sm"
+                          className="w-full bg-gray-700 border border-gray-600 rounded p-1 text-[11px] text-zinc-100 focus:border-blue-500 outline-none"
                           placeholder="考科名稱"
                         />
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <Clock size={12} />
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                        <Clock size={10} className="text-gray-500" />
                         <input 
                           type="time" 
                           value={item.startTime} 
@@ -791,7 +811,7 @@ export default function App() {
                             newSched[index].startTime = e.target.value;
                             setSchedule(newSched);
                           }}
-                          className="bg-gray-700 border border-gray-600 rounded p-1"
+                          className="bg-gray-700 border border-gray-600 rounded p-0.5 text-[10px] text-zinc-100 outline-none"
                         />
                         <span>~</span>
                         <input 
@@ -802,7 +822,7 @@ export default function App() {
                             newSched[index].endTime = e.target.value;
                             setSchedule(newSched);
                           }}
-                          className="bg-gray-700 border border-gray-600 rounded p-1"
+                          className="bg-gray-700 border border-gray-600 rounded p-0.5 text-[10px] text-zinc-100 outline-none"
                         />
                       </div>
                     </div>
@@ -811,28 +831,27 @@ export default function App() {
               </section>
 
               {/* Firebase 雲端同步管理與安全保障說明 */}
-              <section className="mb-10 p-6 bg-white/5 rounded-2xl border border-white/5">
-                <h3 className="text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2 text-zinc-100 uppercase tracking-wider">
-                  <Cloud className="text-emerald-400" size={16} /> Firebase 雲端同步安全防護
+              <section className="mb-5 p-4 bg-white/5 rounded-xl border border-white/5">
+                <h3 className="text-xs font-bold mb-3 flex items-center gap-2 border-b border-white/10 pb-1.5 text-zinc-200 uppercase tracking-wider">
+                  <Cloud className="text-emerald-400" size={14} /> Firebase 雲端同步安全防護
                 </h3>
                 
-                <p className="text-[11px] text-zinc-300 mb-4 leading-relaxed">
-                  本系統與您其他的 Cloud 應用程式共用同一個 database。
-                  為了避免多個專案相互覆蓋、造成資料毀損或遺失，我們已實作並部署
+                <p className="text-[10px] text-zinc-300 mb-2.5 leading-relaxed">
+                  本系統與您其他的 Cloud 應用程式共用同一個 database。為了避免相互覆蓋，此專案已實作與部署
                   <span className="text-emerald-400 font-bold mx-1">安全隔離機制</span>。
                 </p>
 
-                <div className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/25 text-[11px] text-emerald-300 mb-4 space-y-1.5 leading-relaxed">
-                  <div className="font-semibold flex items-center gap-1.5 text-emerald-200">
+                <div className="bg-emerald-500/10 rounded-lg p-2.5 border border-emerald-500/25 text-[10px] text-emerald-300 mb-2.5 space-y-1 leading-relaxed">
+                  <div className="font-semibold flex items-center gap-1 text-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     <span>資料路徑安全隔離保護中</span>
                   </div>
                   <div>
-                    當前系統僅會讀寫屬於本專案底下的專屬 <code className="bg-black/30 px-1 py-0.5 rounded text-white font-mono">/examclock</code> 子節點，其他任何像 <code className="bg-black/30 px-1 py-0.5 rounded text-white font-mono">/service-296550072937</code> 的 Firebase 結構、服務或檔案皆已完全隔離，保證絕對不會互相覆蓋或遺失！
+                    當前系統僅會讀寫屬於本專案底下的專屬 <code className="bg-black/30 px-1 py-0.5 rounded text-white font-mono text-[9px]">/examclock</code> 子節點，其他任何 Firebase 服務或檔案皆已安全隔離，絕對不會與您的其他後台程式互相覆蓋。
                   </div>
                 </div>
 
-                <div className="space-y-3 p-3 bg-gray-800/40 rounded-xl text-[11px] border border-white/5">
+                <div className="space-y-2 p-2.5 bg-gray-800/40 rounded-lg text-[10px] border border-white/5">
                   <div className="flex justify-between items-center text-zinc-400">
                     <span>同步狀態：</span>
                     <span className={`font-bold ${
@@ -848,7 +867,7 @@ export default function App() {
                     </span>
                   </div>
                   {lastSyncedTime && (
-                    <div className="flex justify-between items-center text-zinc-500 text-[10px]">
+                    <div className="flex justify-between items-center text-zinc-500 text-[9px]">
                       <span>上次儲存時間：</span>
                       <span>{lastSyncedTime}</span>
                     </div>
@@ -856,17 +875,17 @@ export default function App() {
                 </div>
               </section>
 
-              <div className="mt-8 mb-4">
+              <div className="mt-6 mb-3">
                 <button 
                   onClick={() => setShowSettings(false)}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl text-xl font-bold shadow-lg transition-all active:scale-95"
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-all active:scale-95 cursor-pointer"
                 >
                   儲存並離開
                 </button>
               </div>
 
-              <div className="text-center text-xs text-gray-500 mt-6">
-                PROCTOR CLOCK v1.0 • 資料已儲存於瀏覽器 LocalStorage
+              <div className="text-center text-[10px] text-gray-550 mt-4">
+                PROCTOR CLOCK v1.0 • 資料已同步儲存
               </div>
             </div>
           </motion.div>
