@@ -13,6 +13,9 @@ import {
   X, 
   ChevronLeft, 
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
   Clock,
   Users,
   Shield,
@@ -40,6 +43,7 @@ interface AppSettings {
   cardBg: string;
   pageBg: string;
   fontFamily: string;
+  enableWakeLock?: boolean;
 }
 
 // --- 輔助函數 ---
@@ -72,14 +76,29 @@ export default function App() {
   // 設定狀態
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
-    return saved ? JSON.parse(saved) : {
+    const defaults = {
       showSeconds: true,
       digitColor: '#ffffff',
       cardBg: '#1e1e1e',
       pageBg: '#0a0a0a',
-      fontFamily: 'var(--font-montserrat)'
+      fontFamily: 'var(--font-montserrat)',
+      enableWakeLock: true
     };
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return { ...defaults, ...parsed };
+      } catch (err) {
+        return defaults;
+      }
+    }
+    return defaults;
   });
+
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   // 考程狀態
   const [schedule, setSchedule] = useState<ScheduleItem[]>(() => {
@@ -101,6 +120,11 @@ export default function App() {
 
   // --- Screen Wake Lock 螢幕不休眠鎖定 ---
   const requestWakeLock = useCallback(async (isManual = false) => {
+    // 若設定中並未啟用防休眠鎖，且不是點擊手動嘗試，則不自動發起
+    if (!isManual && settingsRef.current.enableWakeLock === false) {
+      return;
+    }
+
     if (!('wakeLock' in navigator)) {
       setWakeLockError('not-supported');
       return;
@@ -242,6 +266,32 @@ export default function App() {
     }));
     startCounterTimeout();
   };
+
+  // --- 考程重新排列與排序功能 ---
+  const moveScheduleItem = useCallback((index: number, direction: 'up' | 'down') => {
+    setSchedule(prev => {
+      const newSched = [...prev];
+      const targetIdx = direction === 'up' ? index - 1 : index + 1;
+      if (targetIdx < 0 || targetIdx >= newSched.length) return prev;
+      
+      // Swap
+      const temp = newSched[index];
+      newSched[index] = newSched[targetIdx];
+      newSched[targetIdx] = temp;
+      return newSched;
+    });
+  }, []);
+
+  const sortScheduleChronologically = useCallback(() => {
+    setSchedule(prev => {
+      const sorted = [...prev].sort((a, b) => {
+        if (a.startTime < b.startTime) return -1;
+        if (a.startTime > b.startTime) return 1;
+        return 0;
+      });
+      return sorted;
+    });
+  }, []);
 
   // --- 考程邏輯：比對當前時間 ---
   const currentExam = schedule.find(item => {
@@ -478,6 +528,28 @@ export default function App() {
                     />
                   </div>
 
+                  <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                    <div className="flex flex-col">
+                      <span>啟用防螢幕休眠</span>
+                      <span className="text-xs text-zinc-400">保持設備在監考期間開啟亮屏</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.enableWakeLock !== false}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setSettings({...settings, enableWakeLock: enabled});
+                        if (!enabled) {
+                          releaseWakeLock();
+                        } else {
+                          // Try activating
+                          setTimeout(() => requestWakeLock(true), 50);
+                        }
+                      }}
+                      className="w-6 h-6 rounded accent-emerald-500 cursor-pointer"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs text-gray-400 mb-2 uppercase tracking-widest">數字顏色</label>
@@ -511,25 +583,56 @@ export default function App() {
 
               {/* 考程管理 */}
               <section className="mb-10 p-6 bg-white/5 rounded-2xl">
-                <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-2">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">考程自動排程</h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-white/10 pb-3">
+                <h3 className="text-lg font-semibold flex items-center gap-2">考程自動排程</h3>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button 
+                    onClick={sortScheduleChronologically}
+                    className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 hover:text-blue-400 border border-white/10 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+                    title="依開始時間先後順序自動排列考程"
+                  >
+                    <ArrowUpDown size={12} />
+                    <span>依時間排序</span>
+                  </button>
                   <button 
                     onClick={() => setSchedule([...schedule, { id: Date.now().toString(), period: '新', subject: '新考科', startTime: '12:00', endTime: '13:00' }])}
-                    className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded-full transition-colors"
+                    className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
                   >
-                    <Plus size={14} /> 新增考程
+                    <Plus size={14} />
+                    <span>新增考程</span>
                   </button>
                 </div>
+              </div>
 
                 <div className="space-y-4">
                   {schedule.map((item, index) => (
                     <div key={item.id} className="p-4 bg-gray-800/50 rounded-xl border border-white/10 space-y-3 group relative">
-                      <button 
-                        onClick={() => setSchedule(schedule.filter(s => s.id !== item.id))}
-                        className="absolute -top-2 -right-2 text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 rounded-full p-1 border border-red-500/20"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* 右上角操作按鈕 tray (重新排列、刪除功能鍵) */}
+                      <div className="absolute top-2 right-2 flex items-center space-x-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          disabled={index === 0}
+                          onClick={() => moveScheduleItem(index, 'up')}
+                          className="text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:opacity-30 bg-gray-900/80 rounded p-1 border border-white/5 transition-colors cursor-pointer"
+                          title="上移"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button 
+                          disabled={index === schedule.length - 1}
+                          onClick={() => moveScheduleItem(index, 'down')}
+                          className="text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:opacity-30 bg-gray-900/80 rounded p-1 border border-white/5 transition-colors cursor-pointer"
+                          title="下移"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                        <button 
+                          onClick={() => setSchedule(schedule.filter(s => s.id !== item.id))}
+                          className="text-red-400 hover:text-red-300 bg-gray-900/80 rounded p-1 border border-red-500/10 transition-colors cursor-pointer"
+                          title="刪除"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
 
                       <div className="flex gap-2">
                         <input 
@@ -603,73 +706,86 @@ export default function App() {
       </AnimatePresence>
 
       {/* 畫面右下防休眠提醒與新分頁導引 */}
-      <div className="absolute bottom-4 right-4 z-40 max-w-xs md:max-w-sm bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl text-white transition-all duration-300 hover:border-white/20">
-        <div className="flex items-start gap-3">
-          {wakeLockActive ? (
-            <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400 shrink-0">
-              <Shield size={20} className="animate-pulse" />
-            </div>
-          ) : wakeLockError === 'permission' ? (
-            <div className="bg-rose-500/20 p-2 rounded-xl text-rose-400 shrink-0">
-              <ShieldAlert size={20} className="animate-bounce" />
-            </div>
-          ) : (
-            <div className="bg-amber-500/20 p-2 rounded-xl text-amber-400 shrink-0">
-              <ShieldAlert size={20} />
-            </div>
-          )}
-          
-          <div className="flex-1 min-w-0">
-            <h4 className="text-xs md:text-sm font-bold flex items-center gap-1.5 text-gray-100">
-              <span>防休眠狀態：</span>
-              {wakeLockActive ? (
-                <span className="text-emerald-400 font-extrabold">防護中</span>
-              ) : wakeLockError === 'permission' ? (
-                <span className="text-rose-400 font-extrabold">權限受限</span>
-              ) : wakeLockError === 'not-supported' ? (
-                <span className="text-gray-400">不支援此設備</span>
-              ) : (
-                <span className="text-amber-400">未啟用</span>
-              )}
-            </h4>
+      {settings.enableWakeLock !== false && (
+        <div className="absolute bottom-4 right-4 z-40 max-w-xs md:max-w-sm bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl text-white transition-all duration-300 hover:border-white/20">
+          <div className="flex items-start gap-3">
+            {wakeLockActive ? (
+              <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400 shrink-0">
+                <Shield size={20} className="animate-pulse" />
+              </div>
+            ) : wakeLockError === 'permission' ? (
+              <div className="bg-rose-500/20 p-2 rounded-xl text-rose-400 shrink-0">
+                <ShieldAlert size={20} className="animate-bounce" />
+              </div>
+            ) : (
+              <div className="bg-amber-500/20 p-2 rounded-xl text-amber-400 shrink-0">
+                <ShieldAlert size={20} />
+              </div>
+            )}
             
-            <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
-              {wakeLockActive ? (
-                "考場守護功能已啟動！本設備在考試期間將會維持在亮屏狀態，不會進入休眠或螢幕保護模式。"
-              ) : wakeLockError === 'permission' ? (
-                "目前正處於「內嵌預覽視窗」，系統不允許在內嵌框架中使用防休眠鎖定功能。請點擊下方按鈕或右上角「在新分頁開啟」，在新頁面即可啟用防休眠機制！"
-              ) : wakeLockError === 'not-supported' ? (
-                "您當前的瀏覽器不支援 Screen Wake Lock。建議使用新版 Chrome、Safari、Safari iOS 或 Edge 瀏覽器以維持螢幕高亮亮屏。"
-              ) : (
-                "防休眠鎖定尚未啟用，螢幕可能會因閒置進入省電模式。若需開啟，請點擊上方安全盾牌啟用。"
-              )}
-            </p>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs md:text-sm font-bold flex items-center gap-1.5 text-gray-100">
+                <span>防休眠狀態：</span>
+                {wakeLockActive ? (
+                  <span className="text-emerald-400 font-extrabold">防護中</span>
+                ) : wakeLockError === 'permission' ? (
+                  <span className="text-rose-400 font-extrabold">權限受限</span>
+                ) : wakeLockError === 'not-supported' ? (
+                  <span className="text-gray-400">不支援此設備</span>
+                ) : (
+                  <span className="text-amber-400">未啟用</span>
+                )}
+              </h4>
+              
+              <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
+                {wakeLockActive ? (
+                  "考場守護功能已啟動！本設備在考試期間將會維持在亮屏狀態，不會進入休眠或螢幕保護模式。"
+                ) : wakeLockError === 'permission' ? (
+                  "目前正處於「內嵌預覽視窗」，系統不允許在內嵌框架中使用防休眠鎖定功能。請點擊下方按鈕或右上角「在新分頁開啟」，在新頁面即可啟用防休眠機制！"
+                ) : wakeLockError === 'not-supported' ? (
+                  "您當前的瀏覽器不支援 Screen Wake Lock。建議使用新版 Chrome、Safari、Safari iOS 或 Edge 瀏覽器以維持螢幕高亮亮屏。"
+                ) : (
+                  "防休眠鎖定尚未啟用，螢幕可能會因閒置進入省電模式。若需開啟，請點擊上方安全盾牌啟用。"
+                )}
+              </p>
 
-            {/* 引導按鈕：如果是權限錯誤，則按此彈出新分頁 */}
-            {wakeLockError === 'permission' && (
+              {/* 引導按鈕：如果是權限錯誤，則按此彈出新分頁 */}
+              {wakeLockError === 'permission' && (
+                <button
+                  onClick={() => {
+                    window.open(window.location.href, '_blank');
+                  }}
+                  className="mt-3 flex items-center justify-center gap-2 w-full bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-md hover:scale-[1.02] cursor-pointer"
+                >
+                  <ExternalLink size={14} />
+                  <span>在新分頁開啟 (立即啟用防休眠)</span>
+                </button>
+              )}
+
+              {/* 如果是未啟用 (手動啟用按鈕) */}
+              {!wakeLockActive && !wakeLockError && (
+                <button
+                  onClick={() => requestWakeLock(true)}
+                  className="mt-3 flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <span>嘗試啟用防休眠</span>
+                </button>
+              )}
+
+              {/* 關閉/選擇不啟用按鈕 */}
               <button
                 onClick={() => {
-                  window.open(window.location.href, '_blank');
+                  setSettings(prev => ({ ...prev, enableWakeLock: false }));
+                  releaseWakeLock();
                 }}
-                className="mt-3 flex items-center justify-center gap-2 w-full bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-md hover:scale-[1.02] cursor-pointer"
+                className="mt-2.5 text-center block w-full text-[10px] text-gray-400 hover:text-rose-300 transition-colors underline cursor-pointer"
               >
-                <ExternalLink size={14} />
-                <span>在新分頁開啟 (立即啟用防休眠)</span>
+                強度關閉：不啟用防休眠並關閉此提醒
               </button>
-            )}
-
-            {/* 如果是未啟用 (手動啟用按鈕) */}
-            {!wakeLockActive && !wakeLockError && (
-              <button
-                onClick={() => requestWakeLock(true)}
-                className="mt-3 flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <span>嘗試啟用防休眠</span>
-              </button>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
