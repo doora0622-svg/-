@@ -204,15 +204,29 @@ export default function App() {
       requestWakeLock();
     };
 
+    // 監聽全螢幕狀態，進入全螢幕時預設啟用防休眠狀態
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullScreen(isFull);
+      if (isFull) {
+        // 設定防休眠設定值為啟用
+        setSettings(prev => ({ ...prev, enableWakeLock: true }));
+        // 立即請求防螢幕休眠鎖
+        requestWakeLock(true);
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('click', handleUserInteraction);
     document.addEventListener('touchstart', handleUserInteraction);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
       releaseWakeLock();
     };
   }, [requestWakeLock, releaseWakeLock]);
@@ -239,10 +253,10 @@ export default function App() {
       document.documentElement.requestFullscreen().catch(err => {
         console.error(`Error attempting to enable fullscreen: ${err.message}`);
       });
-      setIsFullScreen(true);
     } else {
-      document.exitFullscreen();
-      setIsFullScreen(false);
+      document.exitFullscreen().catch(err => {
+        console.error(`Error attempting to exit fullscreen: ${err.message}`);
+      });
     }
   };
 
@@ -707,7 +721,17 @@ export default function App() {
 
       {/* 畫面右下防休眠提醒與新分頁導引 */}
       {settings.enableWakeLock !== false && (
-        <div className="absolute bottom-4 right-4 z-40 max-w-xs md:max-w-sm bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl text-white transition-all duration-300 hover:border-white/20">
+        <div className="absolute bottom-4 right-4 z-40 max-w-xs md:max-w-sm bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 pr-10 shadow-2xl text-white transition-all duration-300 hover:border-white/20 relative">
+          <button 
+            onClick={() => {
+              setSettings(prev => ({ ...prev, enableWakeLock: false }));
+              releaseWakeLock();
+            }}
+            className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors cursor-pointer p-1 rounded-full hover:bg-white/10"
+            title="關閉提示"
+          >
+            <X size={16} />
+          </button>
           <div className="flex items-start gap-3">
             {wakeLockActive ? (
               <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400 shrink-0">
