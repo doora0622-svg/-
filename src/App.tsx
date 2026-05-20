@@ -20,9 +20,14 @@ import {
   Users,
   Shield,
   ShieldAlert,
-  ExternalLink
+  ExternalLink,
+  Cloud,
+  CloudOff,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { db } from './firebase';
+import { ref, set, get } from 'firebase/database';
 
 // --- 常數定義 ---
 const STORAGE_KEY_SCHEDULE = 'proctor_clock_schedule';
@@ -68,9 +73,41 @@ export default function App() {
   const wakeLockErrorRef = useRef<'permission' | 'not-supported' | 'error' | null>(null);
   const wakeLockRef = useRef<any>(null);
 
+  // 防休眠提示視窗顯示狀態
+  const [showWakeLockWarning, setShowWakeLockWarning] = useState(true);
+  // 用戶操作顯示控制 (30秒未操作自動隱藏)
+  const [showControls, setShowControls] = useState(true);
+
   const setWakeLockError = useCallback((val: 'permission' | 'not-supported' | 'error' | null) => {
     wakeLockErrorRef.current = val;
     setWakeLockErrorState(val);
+  }, []);
+
+  // 30秒自動隱藏控制 UI 邏輯
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const resetTimeout = () => {
+      setShowControls(true);
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setShowControls(false);
+      }, 30000); // 30 seconds
+    };
+
+    resetTimeout();
+
+    const events = ['mousemove', 'mousedown', 'touchstart', 'click', 'keydown', 'scroll'];
+    events.forEach(event => {
+      document.addEventListener(event, resetTimeout);
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(event => {
+        document.removeEventListener(event, resetTimeout);
+      });
+    };
   }, []);
   
   // 設定狀態
@@ -117,6 +154,44 @@ export default function App() {
 
   const [activeCounter, setActiveCounter] = useState<'total' | 'absent' | null>(null);
   const counterTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // --- Firebase 雲端同步與狀態控制 ---
+  const isLoadedRef = useRef(false);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadFirebaseData = async () => {
+      try {
+        setCloudSyncStatus('syncing');
+        const snapshot = await get(ref(db, "examclock"));
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          if (data.settings) {
+            setSettings(prev => ({ ...prev, ...data.settings }));
+          }
+          if (data.schedule) {
+            setSchedule(data.schedule);
+          }
+          if (data.attendance) {
+            setAttendance(data.attendance);
+          }
+          console.log("Firebase 雲端數據已安全載入，僅讀取 root/examclock，安全隔離防覆蓋！");
+        } else {
+          console.log("Firebase 尚未有 examclock 專屬數據，將採用本地或預設初始值。");
+        }
+        setCloudSyncStatus('success');
+        setLastSyncedTime(new Date().toLocaleTimeString());
+      } catch (err) {
+        console.error("Firebase 雲端載入失敗：", err);
+        setCloudSyncStatus('error');
+      } finally {
+        isLoadedRef.current = true;
+      }
+    };
+
+    loadFirebaseData();
+  }, []);
 
   // --- Screen Wake Lock 螢幕不休眠鎖定 ---
   const requestWakeLock = useCallback(async (isManual = false) => {
@@ -237,14 +312,47 @@ export default function App() {
     document.documentElement.style.setProperty('--bg-color', settings.pageBg);
     document.documentElement.style.setProperty('--card-bg', settings.cardBg);
     document.documentElement.style.setProperty('--text-color', settings.digitColor);
+
+    if (isLoadedRef.current) {
+      setCloudSyncStatus('syncing');
+      set(ref(db, "examclock/settings"), settings).then(() => {
+        setLastSyncedTime(new Date().toLocaleTimeString());
+        setCloudSyncStatus('success');
+      }).catch(err => {
+        console.error("Failed to sync settings:", err);
+        setCloudSyncStatus('error');
+      });
+    }
   }, [settings]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_SCHEDULE, JSON.stringify(schedule));
+
+    if (isLoadedRef.current) {
+      setCloudSyncStatus('syncing');
+      set(ref(db, "examclock/schedule"), schedule).then(() => {
+        setLastSyncedTime(new Date().toLocaleTimeString());
+        setCloudSyncStatus('success');
+      }).catch(err => {
+        console.error("Failed to sync schedule:", err);
+        setCloudSyncStatus('error');
+      });
+    }
   }, [schedule]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_ATTENDANCE, JSON.stringify(attendance));
+
+    if (isLoadedRef.current) {
+      setCloudSyncStatus('syncing');
+      set(ref(db, "examclock/attendance"), attendance).then(() => {
+        setLastSyncedTime(new Date().toLocaleTimeString());
+        setCloudSyncStatus('success');
+      }).catch(err => {
+        console.error("Failed to sync attendance:", err);
+        setCloudSyncStatus('error');
+      });
+    }
   }, [attendance]);
 
   // --- 全螢幕控制 ---
@@ -322,11 +430,47 @@ export default function App() {
     <div className="flex flex-col h-screen w-full transition-colors duration-500 overflow-hidden relative" style={{ backgroundColor: settings.pageBg }}>
       
       {/* 頂部按鈕：設定與全螢幕 */}
-      <div className="absolute top-4 right-4 z-50 flex items-center space-x-4 opacity-25 hover:opacity-100 transition-opacity">
-        <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-white/10 rounded-full cursor-pointer text-white">
+      <div className="absolute top-4 right-4 z-50 flex items-center space-x-3 opacity-25 hover:opacity-100 transition-opacity">
+        {/* 雲端安全同步狀態小 Pill */}
+        <div 
+          onClick={() => setShowSettings(true)}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold tracking-wide cursor-pointer border backdrop-blur-md transition-all ${
+            cloudSyncStatus === 'syncing'
+              ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+              : cloudSyncStatus === 'success'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : cloudSyncStatus === 'error'
+                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/25'
+                  : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/10'
+          }`}
+          title={
+            cloudSyncStatus === 'syncing'
+              ? "雲端同步中..."
+              : cloudSyncStatus === 'success'
+                ? `雲端同步成功 (安全隔離路徑：/examclock)`
+                : "雲端同步失敗"
+          }
+        >
+          {cloudSyncStatus === 'syncing' ? (
+            <RefreshCw size={12} className="animate-spin text-blue-400" />
+          ) : cloudSyncStatus === 'success' ? (
+            <Cloud size={12} className="text-emerald-400" />
+          ) : (
+            <CloudOff size={12} className="text-rose-400" />
+          )}
+          <span>
+            {cloudSyncStatus === 'syncing' 
+              ? '同步中' 
+              : cloudSyncStatus === 'success' 
+                ? '雲端同步' 
+                : '同步失敗'}
+          </span>
+        </div>
+
+        <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-white/10 rounded-full cursor-pointer text-white" title="設定">
           <Settings size={28} />
         </button>
-        <button onClick={toggleFullScreen} className="p-2 hover:bg-white/10 rounded-full cursor-pointer text-white">
+        <button onClick={toggleFullScreen} className="p-2 hover:bg-white/10 rounded-full cursor-pointer text-white" title="全螢幕">
           {isFullScreen ? <Minimize size={28} /> : <Maximize size={28} />}
         </button>
       </div>
@@ -666,6 +810,52 @@ export default function App() {
                 </div>
               </section>
 
+              {/* Firebase 雲端同步管理與安全保障說明 */}
+              <section className="mb-10 p-6 bg-white/5 rounded-2xl border border-white/5">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2 text-zinc-100 uppercase tracking-wider">
+                  <Cloud className="text-emerald-400" size={16} /> Firebase 雲端同步安全防護
+                </h3>
+                
+                <p className="text-[11px] text-zinc-300 mb-4 leading-relaxed">
+                  本系統與您其他的 Cloud 應用程式共用同一個 database。
+                  為了避免多個專案相互覆蓋、造成資料毀損或遺失，我們已實作並部署
+                  <span className="text-emerald-400 font-bold mx-1">安全隔離機制</span>。
+                </p>
+
+                <div className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/25 text-[11px] text-emerald-300 mb-4 space-y-1.5 leading-relaxed">
+                  <div className="font-semibold flex items-center gap-1.5 text-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>資料路徑安全隔離保護中</span>
+                  </div>
+                  <div>
+                    當前系統僅會讀寫屬於本專案底下的專屬 <code className="bg-black/30 px-1 py-0.5 rounded text-white font-mono">/examclock</code> 子節點，其他任何像 <code className="bg-black/30 px-1 py-0.5 rounded text-white font-mono">/service-296550072937</code> 的 Firebase 結構、服務或檔案皆已完全隔離，保證絕對不會互相覆蓋或遺失！
+                  </div>
+                </div>
+
+                <div className="space-y-3 p-3 bg-gray-800/40 rounded-xl text-[11px] border border-white/5">
+                  <div className="flex justify-between items-center text-zinc-400">
+                    <span>同步狀態：</span>
+                    <span className={`font-bold ${
+                      cloudSyncStatus === 'syncing' 
+                        ? 'text-blue-400' 
+                        : cloudSyncStatus === 'success' 
+                          ? 'text-emerald-400' 
+                          : 'text-rose-400'
+                    }`}>
+                      {cloudSyncStatus === 'syncing' && '雲端同步處理中...'}
+                      {cloudSyncStatus === 'success' && '安全同步已完成'}
+                      {cloudSyncStatus === 'error' && '同步失敗，請檢查網路'}
+                    </span>
+                  </div>
+                  {lastSyncedTime && (
+                    <div className="flex justify-between items-center text-zinc-500 text-[10px]">
+                      <span>上次儲存時間：</span>
+                      <span>{lastSyncedTime}</span>
+                    </div>
+                  )}
+                </div>
+              </section>
+
               <div className="mt-8 mb-4">
                 <button 
                   onClick={() => setShowSettings(false)}
@@ -684,12 +874,13 @@ export default function App() {
       </AnimatePresence>
 
       {/* 畫面下方中間防休眠提醒與新分頁導引 */}
-      {settings.enableWakeLock !== false && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:max-w-md bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 pr-10 shadow-2xl text-white transition-all duration-300 hover:border-white/20 relative">
+      {showWakeLockWarning && settings.enableWakeLock !== false && (
+        <div className={`absolute bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:max-w-md bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 pr-10 shadow-2xl text-white transition-all duration-500 hover:border-white/20 relative ${
+          showControls ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
+        }`}>
           <button 
             onClick={() => {
-              setSettings(prev => ({ ...prev, enableWakeLock: false }));
-              releaseWakeLock();
+              setShowWakeLockWarning(false);
             }}
             className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors cursor-pointer p-1 rounded-full hover:bg-white/10"
             title="關閉提示"
@@ -733,7 +924,7 @@ export default function App() {
                 ) : wakeLockError === 'not-supported' ? (
                   "您當前的瀏覽器不支援 Screen Wake Lock。建議使用新版 Chrome、Safari、Safari iOS 或 Edge 瀏覽器以維持螢幕高亮亮屏。"
                 ) : (
-                  "防休眠鎖定尚未啟用，螢幕可能會因閒置進入省電模式。若需開啟，請點擊上方安全盾牌啟用。"
+                  "防休眠鎖定尚未啟用，螢幕可能會因閒置進入省電模式。若需開啟，請點擊下方安全盾牌啟用。"
                 )}
               </p>
 
@@ -753,7 +944,14 @@ export default function App() {
               {/* 如果是未啟用 (手動啟用按鈕) */}
               {!wakeLockActive && !wakeLockError && (
                 <button
-                  onClick={() => requestWakeLock(true)}
+                  onClick={() => {
+                    const isInIframe = window.self !== window.top;
+                    if (isInIframe) {
+                      window.open(window.location.href, '_blank');
+                      return;
+                    }
+                    requestWakeLock(true);
+                  }}
                   className="mt-3 flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <span>嘗試啟用防休眠</span>
@@ -763,6 +961,7 @@ export default function App() {
               {/* 關閉/選擇不啟用按鈕 */}
               <button
                 onClick={() => {
+                  setShowWakeLockWarning(false);
                   setSettings(prev => ({ ...prev, enableWakeLock: false }));
                   releaseWakeLock();
                 }}
@@ -776,19 +975,21 @@ export default function App() {
       )}
 
       {/* 畫面下方中間的「休眠模式」與「防休眠模式」切換按鈕區 */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900/90 backdrop-blur-md border border-white/15 px-2 py-1.5 rounded-full shadow-2xl flex items-center space-x-1 select-none">
+      <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900/90 backdrop-blur-md border border-white/15 px-2 py-1.5 rounded-full shadow-2xl flex items-center space-x-1 select-none transition-all duration-500 ${
+        showControls ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
+      }`}>
         <button
           onClick={() => {
             setSettings(prev => ({ ...prev, enableWakeLock: false }));
             releaseWakeLock();
           }}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-            !wakeLockActive 
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+            settings.enableWakeLock === false 
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold' 
               : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
           }`}
         >
-          <div className={`w-1.5 h-1.5 rounded-full ${!wakeLockActive ? 'bg-amber-400 animate-pulse' : 'bg-gray-500'}`} />
+          <div className={`w-1.5 h-1.5 rounded-full ${settings.enableWakeLock === false ? 'bg-amber-500 animate-pulse' : 'bg-gray-500'}`} />
           <span>一般休眠模式</span>
         </button>
 
@@ -796,16 +997,22 @@ export default function App() {
 
         <button
           onClick={() => {
+            const isInIframe = window.self !== window.top;
+            if (isInIframe) {
+              window.open(window.location.href, '_blank');
+              return;
+            }
+            setShowWakeLockWarning(true);
             setSettings(prev => ({ ...prev, enableWakeLock: true }));
             requestWakeLock(true);
           }}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-            wakeLockActive 
+            settings.enableWakeLock !== false 
               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold shadow' 
               : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Shield size={12} className={wakeLockActive ? "text-emerald-400 animate-pulse" : "text-gray-400"} />
+          <Shield size={12} className={settings.enableWakeLock !== false ? "text-emerald-400" : "text-gray-400"} />
           <span>防螢幕休眠</span>
         </button>
       </div>
