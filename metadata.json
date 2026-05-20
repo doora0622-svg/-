@@ -1,6 +1,6 @@
 {
   "name": "考場專用全螢幕翻頁時鐘",
   "description": "具備 3D 翻頁動畫、自動化考程顯示與點名計算器的監考專用網頁應用。",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["screen-wake-lock"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -16,7 +16,8 @@ import {
   Clock,
   Users,
   Shield,
-  ShieldAlert
+  ShieldAlert,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -59,7 +60,14 @@ export default function App() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [wakeLockActive, setWakeLockActive] = useState(false);
+  const [wakeLockError, setWakeLockErrorState] = useState<'permission' | 'not-supported' | 'error' | null>(null);
+  const wakeLockErrorRef = useRef<'permission' | 'not-supported' | 'error' | null>(null);
   const wakeLockRef = useRef<any>(null);
+
+  const setWakeLockError = useCallback((val: 'permission' | 'not-supported' | 'error' | null) => {
+    wakeLockErrorRef.current = val;
+    setWakeLockErrorState(val);
+  }, []);
   
   // 設定狀態
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -92,12 +100,17 @@ export default function App() {
   const counterTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- Screen Wake Lock 螢幕不休眠鎖定 ---
-  const requestWakeLock = useCallback(async () => {
+  const requestWakeLock = useCallback(async (isManual = false) => {
     if (!('wakeLock' in navigator)) {
-      console.warn('Wake Lock API is not supported on this browser.');
+      setWakeLockError('not-supported');
       return;
     }
     
+    // 如果已知在當前環境無權限（如 iframe 中）或不支援，且不是用戶點擊手動操作，則不發起請求避免反覆報錯
+    if (!isManual && (wakeLockErrorRef.current === 'permission' || wakeLockErrorRef.current === 'not-supported')) {
+      return;
+    }
+
     // 如果已經啟用鎖定，先不重複請求
     if (wakeLockRef.current) return;
 
@@ -105,6 +118,7 @@ export default function App() {
       const lock = await (navigator as any).wakeLock.request('screen');
       wakeLockRef.current = lock;
       setWakeLockActive(true);
+      setWakeLockError(null);
 
       // 監聽釋放事件 (例如系統或瀏覽器強行釋放鎖定時)
       lock.addEventListener('release', () => {
@@ -114,10 +128,17 @@ export default function App() {
       });
       console.log('Wake Lock has been successfully acquired.');
     } catch (err: any) {
-      console.error(`Failed to acquire Wake Lock: ${err.message}`);
       setWakeLockActive(false);
+      const isPermError = err.name === 'SecurityError' || err.message?.includes('permissions policy') || err.message?.includes('disallowed');
+      if (isPermError) {
+        setWakeLockError('permission');
+        console.log('Wake lock is disallowed in this sandbox context. Open in a new tab to enable it fully.');
+      } else {
+        setWakeLockError('error');
+        console.log(`Failed to acquire Wake Lock: ${err.message}`);
+      }
     }
-  }, []);
+  }, [setWakeLockError]);
 
   const releaseWakeLock = useCallback(async () => {
     if (wakeLockRef.current) {
@@ -127,10 +148,18 @@ export default function App() {
         setWakeLockActive(false);
         console.log('Wake Lock has been manually released.');
       } catch (err: any) {
-        console.error(`Error releasing Wake Lock: ${err.message}`);
+        console.log(`Error releasing Wake Lock: ${err.message}`);
       }
     }
   }, []);
+
+  const handleWakeLockToggle = useCallback(() => {
+    if (wakeLockActive) {
+      releaseWakeLock();
+    } else {
+      requestWakeLock(true); // manual attempt
+    }
+  }, [wakeLockActive, requestWakeLock, releaseWakeLock]);
 
   // --- 週期性與事件邏輯 ---
   useEffect(() => {
@@ -231,16 +260,40 @@ export default function App() {
       {/* 頂部按鈕：設定與全螢幕 */}
       <div className="absolute top-4 right-4 z-50 flex items-center space-x-4 opacity-25 hover:opacity-100 transition-opacity">
         <div 
-          onClick={requestWakeLock}
+          onClick={handleWakeLockToggle}
           className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer backdrop-blur-md border transition-all ${
             wakeLockActive 
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-              : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+              : wakeLockError === 'permission'
+                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20'
+                : wakeLockError === 'not-supported'
+                  ? 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
           }`}
-          title={wakeLockActive ? "防螢幕休眠鎖定中" : "防螢幕休眠未啟用 (點擊啟用)"}
+          title={
+            wakeLockActive 
+              ? "防螢幕休眠鎖定中，設備將維持在亮屏狀態" 
+              : wakeLockError === 'permission'
+                ? "目前處於內嵌預覽視窗，權限受限。請點擊右上角「在新分頁開啟」以順利啟用防休眠功能"
+                : wakeLockError === 'not-supported'
+                  ? "此設備瀏覽器不支援螢幕喚醒鎖定 API"
+                  : "防螢幕休眠未啟用，點擊啟用防休眠保護"
+          }
         >
-          {wakeLockActive ? <Shield size={14} className="animate-pulse text-emerald-400" /> : <ShieldAlert size={14} className="text-amber-400" />}
-          <span className="hidden sm:inline">{wakeLockActive ? '防休眠保護中' : '未啟用防休眠'}</span>
+          {wakeLockActive ? (
+            <Shield size={14} className="animate-pulse text-emerald-400" />
+          ) : (
+            <ShieldAlert size={14} className={wakeLockError === 'permission' ? "text-rose-400" : "text-amber-400"} />
+          )}
+          <span className="hidden sm:inline">
+            {wakeLockActive 
+              ? '防休眠保護中' 
+              : wakeLockError === 'permission'
+                ? '防休眠受限 (請點右上在新分頁開啟)'
+                : wakeLockError === 'not-supported'
+                  ? '不支援防休眠'
+                  : '未啟用防休眠'}
+          </span>
         </div>
         <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-white/10 rounded-full cursor-pointer text-white">
           <Settings size={28} />
@@ -548,6 +601,75 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 畫面右下防休眠提醒與新分頁導引 */}
+      <div className="absolute bottom-4 right-4 z-40 max-w-xs md:max-w-sm bg-gray-900/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl text-white transition-all duration-300 hover:border-white/20">
+        <div className="flex items-start gap-3">
+          {wakeLockActive ? (
+            <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400 shrink-0">
+              <Shield size={20} className="animate-pulse" />
+            </div>
+          ) : wakeLockError === 'permission' ? (
+            <div className="bg-rose-500/20 p-2 rounded-xl text-rose-400 shrink-0">
+              <ShieldAlert size={20} className="animate-bounce" />
+            </div>
+          ) : (
+            <div className="bg-amber-500/20 p-2 rounded-xl text-amber-400 shrink-0">
+              <ShieldAlert size={20} />
+            </div>
+          )}
+          
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs md:text-sm font-bold flex items-center gap-1.5 text-gray-100">
+              <span>防休眠狀態：</span>
+              {wakeLockActive ? (
+                <span className="text-emerald-400 font-extrabold">防護中</span>
+              ) : wakeLockError === 'permission' ? (
+                <span className="text-rose-400 font-extrabold">權限受限</span>
+              ) : wakeLockError === 'not-supported' ? (
+                <span className="text-gray-400">不支援此設備</span>
+              ) : (
+                <span className="text-amber-400">未啟用</span>
+              )}
+            </h4>
+            
+            <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
+              {wakeLockActive ? (
+                "考場守護功能已啟動！本設備在考試期間將會維持在亮屏狀態，不會進入休眠或螢幕保護模式。"
+              ) : wakeLockError === 'permission' ? (
+                "目前正處於「內嵌預覽視窗」，系統不允許在內嵌框架中使用防休眠鎖定功能。請點擊下方按鈕或右上角「在新分頁開啟」，在新頁面即可啟用防休眠機制！"
+              ) : wakeLockError === 'not-supported' ? (
+                "您當前的瀏覽器不支援 Screen Wake Lock。建議使用新版 Chrome、Safari、Safari iOS 或 Edge 瀏覽器以維持螢幕高亮亮屏。"
+              ) : (
+                "防休眠鎖定尚未啟用，螢幕可能會因閒置進入省電模式。若需開啟，請點擊上方安全盾牌啟用。"
+              )}
+            </p>
+
+            {/* 引導按鈕：如果是權限錯誤，則按此彈出新分頁 */}
+            {wakeLockError === 'permission' && (
+              <button
+                onClick={() => {
+                  window.open(window.location.href, '_blank');
+                }}
+                className="mt-3 flex items-center justify-center gap-2 w-full bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-md hover:scale-[1.02] cursor-pointer"
+              >
+                <ExternalLink size={14} />
+                <span>在新分頁開啟 (立即啟用防休眠)</span>
+              </button>
+            )}
+
+            {/* 如果是未啟用 (手動啟用按鈕) */}
+            {!wakeLockActive && !wakeLockError && (
+              <button
+                onClick={() => requestWakeLock(true)}
+                className="mt-3 flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <span>嘗試啟用防休眠</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
