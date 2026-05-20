@@ -6,8 +6,24 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    base: '/exam-clock/',
-    plugins: [react(), tailwindcss()],
+    base: '/examclock/',
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'dev-redirect',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url === '/' || req.url === '/index.html') {
+              res.writeHead(302, { Location: '/examclock/' });
+              res.end();
+            } else {
+              next();
+            }
+          });
+        }
+      }
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

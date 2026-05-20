@@ -3,16 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://doora0622-svg.github.io/exam-clock/",
+  "homepage": "https://doora0622-svg.github.io/examclock/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/doora0622-svg/exam-clock.git"
+    "url": "git+https://github.com/doora0622-svg/examclock.git"
   },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "predeploy": "npm run build",
+    "predeploy": "vite build --base=/examclock/",
     "deploy": "gh-pages -d dist",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
