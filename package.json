@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "homepage": "https://doora0622-svg.github.io/exam-clock/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doora0622-svg/exam-clock.git"
+  },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
