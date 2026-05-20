@@ -14,7 +14,9 @@ import {
   ChevronLeft, 
   ChevronRight,
   Clock,
-  Users
+  Users,
+  Shield,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -56,6 +58,8 @@ export default function App() {
   const [time, setTime] = useState(new Date());
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [wakeLockActive, setWakeLockActive] = useState(false);
+  const wakeLockRef = useRef<any>(null);
   
   // 設定狀態
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -87,11 +91,78 @@ export default function App() {
   const [activeCounter, setActiveCounter] = useState<'total' | 'absent' | null>(null);
   const counterTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- 週期性邏輯 ---
+  // --- Screen Wake Lock 螢幕不休眠鎖定 ---
+  const requestWakeLock = useCallback(async () => {
+    if (!('wakeLock' in navigator)) {
+      console.warn('Wake Lock API is not supported on this browser.');
+      return;
+    }
+    
+    // 如果已經啟用鎖定，先不重複請求
+    if (wakeLockRef.current) return;
+
+    try {
+      const lock = await (navigator as any).wakeLock.request('screen');
+      wakeLockRef.current = lock;
+      setWakeLockActive(true);
+
+      // 監聽釋放事件 (例如系統或瀏覽器強行釋放鎖定時)
+      lock.addEventListener('release', () => {
+        wakeLockRef.current = null;
+        setWakeLockActive(false);
+        console.log('Wake Lock was released by the system.');
+      });
+      console.log('Wake Lock has been successfully acquired.');
+    } catch (err: any) {
+      console.error(`Failed to acquire Wake Lock: ${err.message}`);
+      setWakeLockActive(false);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        setWakeLockActive(false);
+        console.log('Wake Lock has been manually released.');
+      } catch (err: any) {
+        console.error(`Error releasing Wake Lock: ${err.message}`);
+      }
+    }
+  }, []);
+
+  // --- 週期性與事件邏輯 ---
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    
+    // 初始化自動請求防休眠
+    requestWakeLock();
+
+    // 處理頁面可見度改變 (切換分頁或鎖屏後回來自動重取)
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    };
+
+    // 由於行動裝置 iOS/Safari 等常有硬性手勢互動限制，添加用戶點擊互動即嘗試重新喚醒 Wake Lock
+    const handleUserInteraction = () => {
+      requestWakeLock();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+      releaseWakeLock();
+    };
+  }, [requestWakeLock, releaseWakeLock]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
@@ -158,7 +229,19 @@ export default function App() {
     <div className="flex flex-col h-screen w-full transition-colors duration-500 overflow-hidden relative" style={{ backgroundColor: settings.pageBg }}>
       
       {/* 頂部按鈕：設定與全螢幕 */}
-      <div className="absolute top-4 right-4 z-50 flex space-x-4 opacity-20 hover:opacity-100 transition-opacity">
+      <div className="absolute top-4 right-4 z-50 flex items-center space-x-4 opacity-25 hover:opacity-100 transition-opacity">
+        <div 
+          onClick={requestWakeLock}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer backdrop-blur-md border transition-all ${
+            wakeLockActive 
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+              : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+          }`}
+          title={wakeLockActive ? "防螢幕休眠鎖定中" : "防螢幕休眠未啟用 (點擊啟用)"}
+        >
+          {wakeLockActive ? <Shield size={14} className="animate-pulse text-emerald-400" /> : <ShieldAlert size={14} className="text-amber-400" />}
+          <span className="hidden sm:inline">{wakeLockActive ? '防休眠保護中' : '未啟用防休眠'}</span>
+        </div>
         <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-white/10 rounded-full cursor-pointer text-white">
           <Settings size={28} />
         </button>
